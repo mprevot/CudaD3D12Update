@@ -1,0 +1,46 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="DX12CudaSample.cpp" />
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Win32Application.cpp" />
+    <ClCompile Include="simpleD3D12.cpp" />
+    <ClCompile Include="stdafx.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DX12CudaSample.h" />
+    <ClInclude Include="DXSampleHelper.h" />
+    <ClInclude Include="ShaderStructs.h" />
+    <ClInclude Include="Win32Application.h" />
+    <ClInclude Include="d3dx12.h" />
+    <ClInclude Include="simpleD3D12.h" />
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="shaders.hlsl">
+      <Filter>shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="float_intrinsic2.h">
+      <Filter>intrinsics</Filter>
+    </ClInclude>
+    <ClInclude Include="float_intrinsics.h">
+      <Filter>intrinsics</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{89e36ac7-ab2a-450e-991e-1dc3b3ba26ea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="intrinsics">
+      <UniqueIdentifier>{e85e1118-58d3-4637-a5b4-ec89a9786f77}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="texShader.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="TextureKernel.cu">
+      <Filter>shaders</Filter>
+    </CudaCompile>
+  </ItemGroup>
+</Project>
