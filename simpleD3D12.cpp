@@ -5,6 +5,11 @@
 
 using namespace std;
 
+//DXGI_FORMAT_R16G16B16A16_FLOAT
+//DXGI_FORMAT_R8G8B8A8_UNORM
+//DXGI_FORMAT_R10G10B10A2_UNORM
+#define DGXIFormat DXGI_FORMAT_R16G16B16A16_FLOAT
+
 class WindowsSecurityAttributes {
 protected:
 	SECURITY_ATTRIBUTES m_winSecurityAttributes;
@@ -123,7 +128,7 @@ void DX12CudaInterop::LoadPipeline()
 	swapChainDesc.BufferCount = FrameCount;
 	swapChainDesc.Width = m_width;
 	swapChainDesc.Height = m_height;
-	swapChainDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	swapChainDesc.Format = DGXIFormat;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.SampleDesc.Count = 1;
@@ -177,22 +182,22 @@ void DX12CudaInterop::LoadPipeline()
 void DX12CudaInterop::InitCuda()
 {
 	int num_cuda_devices = 0;
-	checkCudaErrors(cudaGetDeviceCount(&num_cuda_devices));
+	CheckCudaErrors(cudaGetDeviceCount(&num_cuda_devices));
 
 	if (!num_cuda_devices)
 		throw std::exception("No CUDA Devices found");
 	for (UINT devId = 0; devId < num_cuda_devices; devId++)
 	{
-		cudaDeviceProp devProp;
-		checkCudaErrors(cudaGetDeviceProperties(&devProp, devId));
-
-		if (memcmp(&m_dx12deviceluid.LowPart, devProp.luid, sizeof(m_dx12deviceluid.LowPart)) == 0
-			&& memcmp(&m_dx12deviceluid.HighPart, devProp.luid + sizeof(m_dx12deviceluid.LowPart), sizeof(m_dx12deviceluid.HighPart)) == 0)
+		cudaDeviceProp devProp{};
+		CheckCudaErrors(cudaGetDeviceProperties(&devProp, devId));
+		auto cmp1 = memcmp(&m_dx12deviceluid.LowPart, devProp.luid, sizeof(m_dx12deviceluid.LowPart)) == 0;
+		auto cmp2 = memcmp(&m_dx12deviceluid.HighPart, devProp.luid + sizeof(m_dx12deviceluid.LowPart), sizeof(m_dx12deviceluid.HighPart)) == 0;
+		if (cmp1 && cmp2)
         {
-			checkCudaErrors(cudaSetDevice(devId));
+			CheckCudaErrors(cudaSetDevice(devId));
 			m_cudaDeviceID = devId;
 			m_nodeMask = devProp.luidDeviceNodeMask;
-			checkCudaErrors(cudaStreamCreate(&m_streamToRun));
+			CheckCudaErrors(cudaStreamCreate(&m_streamToRun));
 			printf("CUDA Device Used [%d] %s\n", devId, devProp.name);
 			break;
 		}
@@ -279,7 +284,7 @@ void DX12CudaInterop::LoadAssets()
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+		psoDesc.RTVFormats[0] = DGXIFormat;
 		psoDesc.SampleDesc.Count = 1;
 		ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 		NAME_D3D12_OBJECT(m_pipelineState);
@@ -290,8 +295,8 @@ void DX12CudaInterop::LoadAssets()
 	// Create the vertex buffer.
 	ComPtr<ID3D12Resource> vertexBufferUpload{};
 	{
-		auto y = 1.0f;// *m_aspectRatio;
-		auto x = 1.0f;
+		constexpr auto y = 1.0f;// *m_aspectRatio;
+		constexpr auto x = 1.0f;
 		TexVertex quadVertices[] =
 		{
 			{ {-x,-y, 0.0f }, { 0.0f, 0.0f } },
@@ -300,7 +305,7 @@ void DX12CudaInterop::LoadAssets()
 			{ {x,  y, 0.0f }, { 1.0f, 1.0f } },
 		};
 
-		auto vertexBufferSize = sizeof(quadVertices);
+		const auto vertexBufferSize = sizeof(quadVertices);
 		ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize), D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_vertexBuffer)));
 		ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
@@ -325,66 +330,70 @@ void DX12CudaInterop::LoadAssets()
 
 	// Texture
 	{
+		TextureChannels = 4;
 		TextureWidth = m_width;
 		TextureHeight = m_height;
-		auto nPixels = TextureWidth * TextureHeight * 3;
-		auto pixelBufferSize = sizeof(float)* nPixels;
+		const auto textureSurface = TextureWidth * TextureHeight;
+		const auto texturePixels = textureSurface * TextureChannels;
+		const auto textureSizeBytes = sizeof(float)* texturePixels;
 
-		D3D12_RESOURCE_DESC textureDesc{};
-		textureDesc.MipLevels = 1;
-		textureDesc.Format = DXGI_FORMAT_R32G32B32_FLOAT;
-		textureDesc.Width = TextureWidth;
-		textureDesc.Height = TextureHeight;
-		textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-		textureDesc.DepthOrArraySize = 1;
-		textureDesc.SampleDesc.Count = 1;
-		textureDesc.SampleDesc.Quality = 0;
-		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		D3D12_RESOURCE_DESC d3dTexDesc{};
+		d3dTexDesc.MipLevels = 1;
+		d3dTexDesc.Format = TextureChannels == 4 ? DXGI_FORMAT_R32G32B32A32_FLOAT : DXGI_FORMAT_R32G32B32_FLOAT;
+		d3dTexDesc.Width = TextureWidth;
+		d3dTexDesc.Height = TextureHeight;
+		d3dTexDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+		d3dTexDesc.DepthOrArraySize = 1;
+		d3dTexDesc.SampleDesc.Count = 1;
+		d3dTexDesc.SampleDesc.Quality = 0;
+		d3dTexDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
 		ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_SHARED,
-			&textureDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&m_textureBuffer)));
-		NAME_D3D12_OBJECT(m_textureBuffer);
+			&d3dTexDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&TextureArray)));
+		NAME_D3D12_OBJECT(TextureArray);
 
 		// Describe and create a SRV for the texture.
 		{
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.Format = textureDesc.Format;
+			srvDesc.Format = d3dTexDesc.Format;
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			srvDesc.Texture2D.MipLevels = 1;
-			m_device->CreateShaderResourceView(m_textureBuffer.Get(), &srvDesc, m_srvHeap->GetCPUDescriptorHandleForHeapStart());
+			m_device->CreateShaderResourceView(TextureArray.Get(), &srvDesc, m_srvHeap->GetCPUDescriptorHandleForHeapStart());
 			NAME_D3D12_OBJECT(m_srvHeap);
 		}
 
 		// Share m_textureBuffer with cuda
 		{
 			HANDLE sharedHandle{};
-			WindowsSecurityAttributes windowsSecurityAttributes{};
+			WindowsSecurityAttributes secAttr{};
 			LPCWSTR name{};
-			ThrowIfFailed(m_device->CreateSharedHandle(m_textureBuffer.Get(), &windowsSecurityAttributes, GENERIC_ALL, name, &sharedHandle));
+			ThrowIfFailed(m_device->CreateSharedHandle(TextureArray.Get(), &secAttr, GENERIC_ALL, name, &sharedHandle));
+			const auto allocInfo = m_device->GetResourceAllocationInfo(m_nodeMask, 1, &d3dTexDesc);
 
-			D3D12_RESOURCE_ALLOCATION_INFO d3d12ResourceAllocationInfo;
-			d3d12ResourceAllocationInfo = m_device->GetResourceAllocationInfo(m_nodeMask, 1, &CD3DX12_RESOURCE_DESC::Buffer(pixelBufferSize));
-			auto actualSize = d3d12ResourceAllocationInfo.SizeInBytes;
+			cudaExternalMemoryHandleDesc cuExtmemHandleDesc{};
+			cuExtmemHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+			cuExtmemHandleDesc.handle.win32.handle = sharedHandle;
+			cuExtmemHandleDesc.size = allocInfo.SizeInBytes;
+			cuExtmemHandleDesc.flags = cudaExternalMemoryDedicated;
+			CheckCudaErrors(cudaImportExternalMemory(&m_externalMemory, &cuExtmemHandleDesc));
 
-			cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
-	        memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
-			externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
-			externalMemoryHandleDesc.handle.win32.handle = sharedHandle;
-			externalMemoryHandleDesc.size = actualSize;
-			externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
+			cudaExternalMemoryMipmappedArrayDesc cuExtmemMipDesc{};
+			cuExtmemMipDesc.extent = make_cudaExtent(TextureWidth, TextureHeight, 0);
+			cuExtmemMipDesc.formatDesc = cudaCreateChannelDesc<float4>();
+			cuExtmemMipDesc.numLevels = 1;
+			CheckCudaErrors(cudaExternalMemoryGetMappedMipmappedArray(&cuMipArray, m_externalMemory, &cuExtmemMipDesc));
+			CheckCudaErrors(cudaGetMipmappedArrayLevel(&cuArray, cuMipArray, 0));
+			
+			cudaResourceDesc cuResDesc{};
+			cuResDesc.resType = cudaResourceTypeArray;
+			cuResDesc.res.array.array = cuArray;
+			checkCudaErrors(cudaCreateSurfaceObject(&cuSurface, &cuResDesc));
 
-			checkCudaErrors(cudaImportExternalMemory(&m_externalMemory, &externalMemoryHandleDesc));
+			m_AnimTime = 1.0f;
+			UpdateCudaSurface();
 
-			cudaExternalMemoryBufferDesc externalMemoryBufferDesc;
-			memset(&externalMemoryBufferDesc, 0, sizeof(externalMemoryBufferDesc));
-			externalMemoryBufferDesc.offset = 0;
-			externalMemoryBufferDesc.size = pixelBufferSize;
-			externalMemoryBufferDesc.flags = 0;
-
-			checkCudaErrors(cudaExternalMemoryGetMappedBuffer(&m_cudaDevVertptr, m_externalMemory, &externalMemoryBufferDesc));
-			RunKernel(TextureWidth, TextureHeight, (float*)m_cudaDevVertptr, m_streamToRun, 1.0f);
-			checkCudaErrors(cudaStreamSynchronize(m_streamToRun));
+			CheckCudaErrors(cudaStreamSynchronize(m_streamToRun));
 		}
 	}
 
@@ -409,7 +418,7 @@ void DX12CudaInterop::LoadAssets()
 		m_device->CreateSharedHandle(m_fence.Get(), &windowsSecurityAttributes, GENERIC_ALL, name, &sharedHandle);
 		externalSemaphoreHandleDesc.handle.win32.handle = sharedHandle;
 		externalSemaphoreHandleDesc.flags = 0;
-		checkCudaErrors(cudaImportExternalSemaphore(&m_externalSemaphore, &externalSemaphoreHandleDesc));
+		CheckCudaErrors(cudaImportExternalSemaphore(&m_externalSemaphore, &externalSemaphoreHandleDesc));
 		m_fenceValues[m_frameIndex]++;
 
 		m_fenceEvent = CreateEvent(nullptr, false, false, nullptr);
@@ -417,6 +426,11 @@ void DX12CudaInterop::LoadAssets()
 			ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
 		WaitForGpu();
 	}
+}
+
+void DX12CudaInterop::UpdateCudaSurface()
+{
+	RunKernel(TextureWidth, TextureHeight, cuSurface, m_streamToRun, m_AnimTime, TextureChannels);
 }
 
 // Render the scene.
@@ -452,8 +466,8 @@ void DX12CudaInterop::OnDestroy()
 	// Ensure that the GPU is no longer referencing resources that are about to be
 	// cleaned up by the destructor.
 	WaitForGpu();
-	checkCudaErrors(cudaDestroyExternalSemaphore(m_externalSemaphore));
-	checkCudaErrors(cudaDestroyExternalMemory(m_externalMemory));
+	CheckCudaErrors(cudaDestroyExternalSemaphore(m_externalSemaphore));
+	CheckCudaErrors(cudaDestroyExternalMemory(m_externalMemory));
 	CloseHandle(m_fenceEvent);
 }
 
@@ -500,7 +514,6 @@ void DX12CudaInterop::PopulateCommandList()
 	ThrowIfFailed(m_commandList->Close());
 }
 
-// Wait for pending GPU work to complete.
 void DX12CudaInterop::WaitForGpu()
 {
 	// Schedule a Signal command in the queue.
@@ -514,40 +527,31 @@ void DX12CudaInterop::WaitForGpu()
 	m_fenceValues[m_frameIndex]++;
 }
 
-// Prepare to render the next frame.
 void DX12CudaInterop::MoveToNextFrame()
 {
 	const UINT64 currentFenceValue = m_fenceValues[m_frameIndex];
 	
-	cudaExternalSemaphoreWaitParams externalSemaphoreWaitParams;
-	memset(&externalSemaphoreWaitParams, 0, sizeof(externalSemaphoreWaitParams));
+	cudaExternalSemaphoreWaitParams externalSemaphoreWaitParams{};
 	externalSemaphoreWaitParams.params.fence.value = currentFenceValue;
-	externalSemaphoreWaitParams.flags = 0;
-	
-	checkCudaErrors(cudaWaitExternalSemaphoresAsync(&m_externalSemaphore, &externalSemaphoreWaitParams, 1, m_streamToRun));
+	CheckCudaErrors(cudaWaitExternalSemaphoresAsync(&m_externalSemaphore, &externalSemaphoreWaitParams, 1, m_streamToRun));
 
-	timeStep += 2.1;
 	m_AnimTime += .1;
-	RunKernel(TextureWidth, TextureHeight, (float*)m_cudaDevVertptr, m_streamToRun, m_AnimTime);
+	UpdateCudaSurface();
+
 	m_fenceValues[m_frameIndex] = currentFenceValue + 1;
 	
-	cudaExternalSemaphoreSignalParams externalSemaphoreSignalParams;
-	memset(&externalSemaphoreSignalParams, 0, sizeof(externalSemaphoreSignalParams));
+	cudaExternalSemaphoreSignalParams externalSemaphoreSignalParams{};
 	externalSemaphoreSignalParams.params.fence.value = m_fenceValues[m_frameIndex];
-	externalSemaphoreSignalParams.flags = 0;
-
-	checkCudaErrors(cudaSignalExternalSemaphoresAsync(&m_externalSemaphore, &externalSemaphoreSignalParams, 1, m_streamToRun));
+	CheckCudaErrors(cudaSignalExternalSemaphoresAsync(&m_externalSemaphore, &externalSemaphoreSignalParams, 1, m_streamToRun));
 
 	// Update the frame index.
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-
 	// If the next frame is not ready to be rendered yet, wait until it is ready.
 	if (m_fence->GetCompletedValue() < m_fenceValues[m_frameIndex])
 	{
 		ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent));
 		WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
 	}
-
 	// Set the fence value for the next frame.
 	m_fenceValues[m_frameIndex] = currentFenceValue + 2;
 }

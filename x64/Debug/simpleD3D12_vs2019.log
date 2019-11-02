@@ -1,0 +1,11 @@
+﻿FXC : warning X4717: Effects deprecated for D3DCompiler_47
+C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.1\2_Graphics\simpleD3D12\texShader.hlsl(15,5-18): warning X3206: implicit truncation of vector type
+  
+  compilation object save succeeded; see C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.1\bin\win64\Debug\texShader.cso
+  simpleD3D12.cpp
+C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.1\2_Graphics\simpleD3D12\simpleD3D12.h(89,21): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.1\2_Graphics\simpleD3D12\simpleD3D12.cpp(189,29): warning C4018: '<': signed/unsigned mismatch
+C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.1\2_Graphics\simpleD3D12\simpleD3D12.cpp(344,36): warning C4267: '=': conversion from 'size_t' to 'UINT', possible loss of data
+C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.1\2_Graphics\simpleD3D12\simpleD3D12.cpp(508,66): warning C4267: 'argument': conversion from 'size_t' to 'UINT', possible loss of data
+C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.1\2_Graphics\simpleD3D12\simpleD3D12.cpp(538,18): warning C4305: '+=': truncation from 'double' to 'float'
+  simpleD3D12_vs2019.vcxproj -> C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.1\2_Graphics\simpleD3D12\../../bin/win64/Debug/simpleD3D12.exe

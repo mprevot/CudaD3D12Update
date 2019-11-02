@@ -18,4 +18,4 @@ struct TexVertex
 	XMFLOAT2 uv;
 };
 
-void RunKernel(size_t mesh_width, size_t mesh_height, float *cudaDevVertptr, cudaStream_t streamToRun, float AnimTime);
+void RunKernel(size_t mesh_width, size_t mesh_height, cudaSurfaceObject_t cudaDevVertptr, cudaStream_t streamToRun, float animTime, UINT8 nChannels);

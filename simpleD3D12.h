@@ -3,27 +3,33 @@
 #include "DX12CudaSample.h"
 #include "ShaderStructs.h"
 #include <chrono>
+#include <sstream>
+#include <string>
+#include <algorithm>
 
 typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::steady_clock::time_point TimePoint;
 
+using namespace std;
 using namespace DirectX;
-
-// Note that while ComPtr is used to manage the lifetime of resources on the CPU,
-// it has no understanding of the lifetime of resources on the GPU. Apps must account
-// for the GPU lifetime of resources to avoid destroying objects that may still be
-// referenced by the GPU.
-// An example of this can be found in the class method: OnDestroy().
 using Microsoft::WRL::ComPtr;
+
+#define CheckCudaErrors(val) Check((val), #val, __FUNCTION__, __FILE__, __LINE__)
+
+typedef void(__stdcall* MessageChangedCallback)(const wchar_t* string);
 
 class DX12CudaInterop : public DX12CudaSample
 {
 public:
 	DX12CudaInterop(UINT width, UINT height, std::string name);
-
 	virtual void OnInit();
 	virtual void OnRender();
 	virtual void OnDestroy();
+	
+	template <class T>
+	auto Check(T result, const char* func, const char* caller, const char* file, int line) -> void;
+	template <class ... T>
+	auto LogMessage(T&& ... args) -> void;
 
 private:
 	// In this sample we overload the meaning of FrameCount to mean both the maximum
@@ -36,6 +42,9 @@ private:
 	// may result in noticeable latency in your app.
 	static const UINT FrameCount = 2;
 	size_t TextureHeight, TextureWidth;
+
+	vector<wstring> Messages{};
+	MessageChangedCallback LogMessageChangedCallback{};
 
 	ComPtr<IDXGIFactory4> dxgiFactory;
 	ComPtr<ID3D12Debug> debugController;
@@ -57,7 +66,7 @@ private:
 	
 	// App resources.
 	ComPtr<ID3D12Resource> m_vertexBuffer;
-	ComPtr<ID3D12Resource> m_textureBuffer;
+	ComPtr<ID3D12Resource> TextureArray;
 	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
 	// Synchronization objects.
@@ -70,21 +79,55 @@ private:
 
 	// CUDA objects
 	cudaExternalMemoryHandleType m_externalMemoryHandleType;
-	cudaExternalMemory_t	     m_externalMemory;
-	cudaExternalSemaphore_t      m_externalSemaphore;
-	cudaStream_t				 m_streamToRun;
-	LUID						 m_dx12deviceluid;
-	UINT						 m_cudaDeviceID;
-	UINT						 m_nodeMask;
-	float						 m_AnimTime;
+	cudaExternalMemory_t m_externalMemory;
+	cudaExternalSemaphore_t m_externalSemaphore;
+	cudaStream_t m_streamToRun;
+	LUID m_dx12deviceluid;
+	UINT m_cudaDeviceID;
+	UINT m_nodeMask;
+	float m_AnimTime;
 	float timeStep{0.1};
-	void *m_cudaDevVertptr{};
+	
+	float* cuTexArray{};
+	size_t cuTexArraySize;
+	cudaMipmappedArray_t cuMipArray{};
+	cudaArray_t cuArray{};
+	cudaSurfaceObject_t cuSurface{};
 
+	UINT8 TextureChannels;
+	size_t TextureSize_dev{};
+	
 	void LoadPipeline();
 	void InitCuda();
 	void LoadAssets();
+	void UpdateCudaSurface();
 	void PopulateCommandList();
 	void MoveToNextFrame();
 	void WaitForGpu();
-	cudaExternalSemaphoreWaitParams& GetWaitParamSemaphore(UINT64 fence);
 };
+
+template <class T>
+auto DX12CudaInterop::Check(T result, const char* func, const char* caller, const char* file, int line) -> void
+{
+	if (result)
+	{
+		wstringstream o;
+		auto f = string(file);
+		replace(f.begin(), f.end(), '\\', '/');
+		auto justfile = string(f.substr(f.find_last_of('/') + 1));
+		o << caller << "(): " << func << " at " << justfile.c_str() << ":" << line << " [" << cudaGetErrorName((cudaError_t)result) << "]";
+		LogMessage(L"%s\n", o.str().c_str());
+	}
+}
+
+template<class ...T>
+auto DX12CudaInterop::LogMessage(T&&... args) -> void
+{
+	//if (LogMessageChangedCallback != nullptr)
+	{
+		wchar_t updatedMessage[4096];
+		swprintf_s(updatedMessage, forward<T>(args)...);
+		Messages.push_back(*new wstring(updatedMessage));
+		//LogMessageChangedCallback(updatedMessage);
+	}
+}
