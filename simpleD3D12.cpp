@@ -342,65 +342,66 @@ void DX12CudaInterop::LoadAssets()
 		const auto texturePixels = textureSurface * TextureChannels;
 		const auto textureSizeBytes = sizeof(float)* texturePixels;
 
-		D3D12_RESOURCE_DESC d3dTexDesc{};
-		d3dTexDesc.MipLevels = 1;
-		d3dTexDesc.Format = TextureChannels == 4 ? DXGI_FORMAT_R32G32B32A32_FLOAT : DXGI_FORMAT_R32G32B32_FLOAT;
-		d3dTexDesc.Width = TextureWidth;
-		d3dTexDesc.Height = TextureHeight;
-		d3dTexDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-		d3dTexDesc.DepthOrArraySize = 1;
-		d3dTexDesc.SampleDesc.Count = 1;
-		d3dTexDesc.SampleDesc.Quality = 0;
-		d3dTexDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		D3D12_RESOURCE_DESC texDesc{};
+		texDesc.MipLevels = 1;
+		texDesc.Format = TextureChannels == 4 ? DXGI_FORMAT_R32G32B32A32_FLOAT : DXGI_FORMAT_R32G32B32_FLOAT;
+		texDesc.Width = TextureWidth;
+		texDesc.Height = TextureHeight;
+		texDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+		texDesc.DepthOrArraySize = 1;
+		texDesc.SampleDesc.Count = 1;
+		texDesc.SampleDesc.Quality = 0;
+		texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
 		ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_SHARED,
-			&d3dTexDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&TextureArray)));
+			&texDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&TextureArray)));
 		NAME_D3D12_OBJECT(TextureArray);
 
-		// Describe and create a SRV for the texture.
 		{
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.Format = d3dTexDesc.Format;
+			srvDesc.Format = texDesc.Format;
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			srvDesc.Texture2D.MipLevels = 1;
 			m_device->CreateShaderResourceView(TextureArray.Get(), &srvDesc, m_srvHeap->GetCPUDescriptorHandleForHeapStart());
 			NAME_D3D12_OBJECT(m_srvHeap);
 		}
 
-		// Share m_textureBuffer with cuda
 		{
 			HANDLE sharedHandle{};
 			WindowsSecurityAttributes secAttr{};
 			LPCWSTR name{};
 			ThrowIfFailed(m_device->CreateSharedHandle(TextureArray.Get(), &secAttr, GENERIC_ALL, name, &sharedHandle));
-			const auto allocInfo = m_device->GetResourceAllocationInfo(m_nodeMask, 1, &d3dTexDesc);
+			const auto texAllocInfo = m_device->GetResourceAllocationInfo(m_nodeMask, 1, &texDesc);
 
 			cudaExternalMemoryHandleDesc cuExtmemHandleDesc{};
-			cuExtmemHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+			cuExtmemHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Heap;
 			cuExtmemHandleDesc.handle.win32.handle = sharedHandle;
-			cuExtmemHandleDesc.size = allocInfo.SizeInBytes;
+			cuExtmemHandleDesc.size = texAllocInfo.SizeInBytes;
 			cuExtmemHandleDesc.flags = cudaExternalMemoryDedicated;
 			CheckCudaErrors(cudaImportExternalMemory(&m_externalMemory, &cuExtmemHandleDesc));
 
 			cudaExternalMemoryMipmappedArrayDesc cuExtmemMipDesc{};
-			cuExtmemMipDesc.extent = make_cudaExtent(TextureWidth, TextureHeight, 0);
+			cuExtmemMipDesc.extent = make_cudaExtent(texDesc.Width, texDesc.Height, 0);
 			cuExtmemMipDesc.formatDesc = cudaCreateChannelDesc<float4>();
 			cuExtmemMipDesc.numLevels = 1;
+			
 			cudaMipmappedArray_t cuMipArray{};
 			CheckCudaErrors(cudaExternalMemoryGetMappedMipmappedArray(&cuMipArray, m_externalMemory, &cuExtmemMipDesc));
+
 			cudaArray_t cuArray{};
 			CheckCudaErrors(cudaGetMipmappedArrayLevel(&cuArray, cuMipArray, 0));
+
 			cudaResourceDesc cuResDesc{};
 			cuResDesc.resType = cudaResourceTypeArray;
 			cuResDesc.res.array.array = cuArray;
 			checkCudaErrors(cudaCreateSurfaceObject(&cuSurface, &cuResDesc));
-
+			
 			//auto cuCheckSizeBytes = texturePixels * sizeof(UINT8);
 			//CheckCudaErrors(cudaMalloc(&cuCheck, cuCheckSizeBytes));
 			//CheckCudaErrors(cudaMemset(cuCheck, 0, cuCheckSizeBytes));
 			//cuCheck_host = (UINT8*)malloc(cuCheckSizeBytes);
-
+			 
 			m_AnimTime = 1.0f;
 			UpdateCudaSurface();
 			

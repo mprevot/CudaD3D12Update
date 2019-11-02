@@ -25,7 +25,7 @@ __global__ void UpdateSurface(cudaSurfaceObject_t surface, unsigned int width, u
 		pixel = make_float4(1, 0, 0, 1);
 	else if (y == height - 1)
 		pixel = make_float4(1, 0, 1, 1);
-	else if (x%10 == 0)
+	else if (x%5 == 0)
 	{
 		if(x>width/2)
 			pixel = make_float4(0.1, 0.5, costx * 1, 1);
