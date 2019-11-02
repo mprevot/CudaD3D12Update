@@ -131,8 +131,7 @@
     <ClCompile Include="stdafx.cpp" />
     <ClInclude Include="DX12CudaSample.h" />
     <ClInclude Include="DXSampleHelper.h" />
-    <ClInclude Include="float_intrinsic2.h" />
-    <ClInclude Include="float_intrinsics.h" />
+    <ClInclude Include="float_intrinsic.h" />
     <ClInclude Include="ShaderStructs.h" />
     <ClInclude Include="Win32Application.h" />
     <ClInclude Include="d3dx12.h" />

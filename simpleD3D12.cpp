@@ -310,7 +310,7 @@ void DX12CudaInterop::LoadAssets()
 			{ {x,  y, 0.0f }, { 1.0f, 1.0f } },
 		};
 
-		const auto vertexBufferSize = sizeof(quadVertices);
+		constexpr auto vertexBufferSize = sizeof(quadVertices);
 		ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize), D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_vertexBuffer)));
 		ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
@@ -320,12 +320,13 @@ void DX12CudaInterop::LoadAssets()
 		// Copy data to the intermediate upload heap and then schedule a copy 
 		// from the upload heap to the vertex buffer.
 		D3D12_SUBRESOURCE_DATA vertexData{};
-		vertexData.pData = quadVertices;
+		vertexData.pData = &quadVertices[0];
 		vertexData.RowPitch = vertexBufferSize;
 		vertexData.SlicePitch = vertexData.RowPitch;
 
 		UpdateSubresources<1>(m_commandList.Get(), m_vertexBuffer.Get(), vertexBufferUpload.Get(), 0, 0, 1, &vertexData);
-		m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+		m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.Get(),
+			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 		// Initialize the vertex buffer view.
 		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
@@ -342,75 +343,62 @@ void DX12CudaInterop::LoadAssets()
 		const auto texturePixels = textureSurface * TextureChannels;
 		const auto textureSizeBytes = sizeof(float)* texturePixels;
 
-		D3D12_RESOURCE_DESC texDesc{};
-		texDesc.MipLevels = 1;
-		texDesc.Format = TextureChannels == 4 ? DXGI_FORMAT_R32G32B32A32_FLOAT : DXGI_FORMAT_R32G32B32_FLOAT;
-		texDesc.Width = TextureWidth;
-		texDesc.Height = TextureHeight;
-		texDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-		texDesc.DepthOrArraySize = 1;
-		texDesc.SampleDesc.Count = 1;
-		texDesc.SampleDesc.Quality = 0;
-		texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-
+		const auto texFmt = TextureChannels == 4 ? DXGI_FORMAT_R32G32B32A32_FLOAT : DXGI_FORMAT_R32G32B32_FLOAT;
+		const auto texDesc = CD3DX12_RESOURCE_DESC::Tex2D(texFmt, TextureWidth, TextureHeight, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS);
 		ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_SHARED,
 			&texDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&TextureArray)));
 		NAME_D3D12_OBJECT(TextureArray);
 
-		{
-			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.Format = texDesc.Format;
-			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-			srvDesc.Texture2D.MipLevels = 1;
-			m_device->CreateShaderResourceView(TextureArray.Get(), &srvDesc, m_srvHeap->GetCPUDescriptorHandleForHeapStart());
-			NAME_D3D12_OBJECT(m_srvHeap);
-		}
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = texDesc.Format;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = texDesc.MipLevels;
+		m_device->CreateShaderResourceView(TextureArray.Get(), &srvDesc, m_srvHeap->GetCPUDescriptorHandleForHeapStart());
+		NAME_D3D12_OBJECT(m_srvHeap);
 
-		{
-			HANDLE sharedHandle{};
-			WindowsSecurityAttributes secAttr{};
-			LPCWSTR name{};
-			ThrowIfFailed(m_device->CreateSharedHandle(TextureArray.Get(), &secAttr, GENERIC_ALL, name, &sharedHandle));
-			const auto texAllocInfo = m_device->GetResourceAllocationInfo(m_nodeMask, 1, &texDesc);
+		HANDLE sharedHandle{};
+		WindowsSecurityAttributes secAttr{};
+		LPCWSTR name{};
+		ThrowIfFailed(m_device->CreateSharedHandle(TextureArray.Get(), &secAttr, GENERIC_ALL, name, &sharedHandle));
+		const auto texAllocInfo = m_device->GetResourceAllocationInfo(m_nodeMask, 1, &texDesc);
 
-			cudaExternalMemoryHandleDesc cuExtmemHandleDesc{};
-			cuExtmemHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Heap;
-			cuExtmemHandleDesc.handle.win32.handle = sharedHandle;
-			cuExtmemHandleDesc.size = texAllocInfo.SizeInBytes;
-			cuExtmemHandleDesc.flags = cudaExternalMemoryDedicated;
-			CheckCudaErrors(cudaImportExternalMemory(&m_externalMemory, &cuExtmemHandleDesc));
+		cudaExternalMemoryHandleDesc cuExtmemHandleDesc{};
+		cuExtmemHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Heap;
+		cuExtmemHandleDesc.handle.win32.handle = sharedHandle;
+		cuExtmemHandleDesc.size = texAllocInfo.SizeInBytes;
+		cuExtmemHandleDesc.flags = cudaExternalMemoryDedicated;
+		CheckCudaErrors(cudaImportExternalMemory(&m_externalMemory, &cuExtmemHandleDesc));
 
-			cudaExternalMemoryMipmappedArrayDesc cuExtmemMipDesc{};
-			cuExtmemMipDesc.extent = make_cudaExtent(texDesc.Width, texDesc.Height, 0);
-			cuExtmemMipDesc.formatDesc = cudaCreateChannelDesc<float4>();
-			cuExtmemMipDesc.numLevels = 1;
-			
-			cudaMipmappedArray_t cuMipArray{};
-			CheckCudaErrors(cudaExternalMemoryGetMappedMipmappedArray(&cuMipArray, m_externalMemory, &cuExtmemMipDesc));
+		cudaExternalMemoryMipmappedArrayDesc cuExtmemMipDesc{};
+		cuExtmemMipDesc.extent = make_cudaExtent(texDesc.Width, texDesc.Height, 0);
+		cuExtmemMipDesc.formatDesc = cudaCreateChannelDesc<float4>();
+		cuExtmemMipDesc.numLevels = 1;
+		
+		cudaMipmappedArray_t cuMipArray{};
+		CheckCudaErrors(cudaExternalMemoryGetMappedMipmappedArray(&cuMipArray, m_externalMemory, &cuExtmemMipDesc));
 
-			cudaArray_t cuArray{};
-			CheckCudaErrors(cudaGetMipmappedArrayLevel(&cuArray, cuMipArray, 0));
+		cudaArray_t cuArray{};
+		CheckCudaErrors(cudaGetMipmappedArrayLevel(&cuArray, cuMipArray, 0));
 
-			cudaResourceDesc cuResDesc{};
-			cuResDesc.resType = cudaResourceTypeArray;
-			cuResDesc.res.array.array = cuArray;
-			checkCudaErrors(cudaCreateSurfaceObject(&cuSurface, &cuResDesc));
-			
-			//auto cuCheckSizeBytes = texturePixels * sizeof(UINT8);
-			//CheckCudaErrors(cudaMalloc(&cuCheck, cuCheckSizeBytes));
-			//CheckCudaErrors(cudaMemset(cuCheck, 0, cuCheckSizeBytes));
-			//cuCheck_host = (UINT8*)malloc(cuCheckSizeBytes);
-			 
-			m_AnimTime = 1.0f;
-			UpdateCudaSurface();
-			
-			CheckCudaErrors(cudaStreamSynchronize(m_streamToRun));
-			//CheckCudaErrors(cudaMemcpy(cuCheck_host, cuCheck, cuCheckSizeBytes, cudaMemcpyDeviceToHost));
-			//auto file = "cuCheck.tif";
-			//WriteImageToFile(file, cuCheck_host);
-			//Open(file);
-		}
+		cudaResourceDesc cuResDesc{};
+		cuResDesc.resType = cudaResourceTypeArray;
+		cuResDesc.res.array.array = cuArray;
+		checkCudaErrors(cudaCreateSurfaceObject(&cuSurface, &cuResDesc));
+		
+		//auto cuCheckSizeBytes = texturePixels * sizeof(UINT8);
+		//CheckCudaErrors(cudaMalloc(&cuCheck, cuCheckSizeBytes));
+		//CheckCudaErrors(cudaMemset(cuCheck, 0, cuCheckSizeBytes));
+		//cuCheck_host = (UINT8*)malloc(cuCheckSizeBytes);
+		 
+		m_AnimTime = 1.0f;
+		UpdateCudaSurface();
+		
+		CheckCudaErrors(cudaStreamSynchronize(m_streamToRun));
+		//CheckCudaErrors(cudaMemcpy(cuCheck_host, cuCheck, cuCheckSizeBytes, cudaMemcpyDeviceToHost));
+		//auto file = "cuCheck.tif";
+		//WriteImageToFile(file, cuCheck_host);
+		//Open(file);
 	}
 
 	// Close and execute commands
@@ -458,7 +446,6 @@ void DX12CudaInterop::OnRender()
 	std::stringstream s;
 	s << " Freq: " << 1.0f / period.count() << " Hz";
 	SetCustomWindowText(s.str().c_str());
-	
 	
 	// Record all the commands we need to render the scene into the command list.
 	PopulateCommandList();
@@ -551,7 +538,7 @@ void DX12CudaInterop::MoveToNextFrame()
 	externalSemaphoreWaitParams.params.fence.value = currentFenceValue;
 	CheckCudaErrors(cudaWaitExternalSemaphoresAsync(&m_externalSemaphore, &externalSemaphoreWaitParams, 1, m_streamToRun));
 
-	m_AnimTime += .1;
+	m_AnimTime += .05;
 	UpdateCudaSurface();
 
 	m_fenceValues[m_frameIndex] = currentFenceValue + 1;

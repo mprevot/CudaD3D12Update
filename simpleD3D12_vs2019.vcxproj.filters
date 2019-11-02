@@ -18,10 +18,7 @@
     <ClInclude Include="shaders.hlsl">
       <Filter>shaders</Filter>
     </ClInclude>
-    <ClInclude Include="float_intrinsic2.h">
-      <Filter>intrinsics</Filter>
-    </ClInclude>
-    <ClInclude Include="float_intrinsics.h">
+    <ClInclude Include="float_intrinsic.h">
       <Filter>intrinsics</Filter>
     </ClInclude>
   </ItemGroup>
