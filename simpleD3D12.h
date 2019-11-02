@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include <tiffio.h>
 
 typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::steady_clock::time_point TimePoint;
@@ -30,16 +31,10 @@ public:
 	auto Check(T result, const char* func, const char* caller, const char* file, int line) -> void;
 	template <class ... T>
 	auto LogMessage(T&& ... args) -> void;
+	template <class T>
+	auto WriteImageToFile(const char* filename, T* image) -> void;
 
 private:
-	// In this sample we overload the meaning of FrameCount to mean both the maximum
-	// number of frames that will be queued to the GPU at a time, as well as the number
-	// of back buffers in the DXGI swap chain. For the majority of applications, this
-	// is convenient and works well. However, there will be certain cases where an
-	// application may want to queue up more frames than there are back buffers
-	// available.
-	// It should be noted that excessive buffering of frames dependent on user input
-	// may result in noticeable latency in your app.
 	static const UINT FrameCount = 2;
 	size_t TextureHeight, TextureWidth;
 
@@ -88,11 +83,9 @@ private:
 	float m_AnimTime;
 	float timeStep{0.1};
 	
-	float* cuTexArray{};
-	size_t cuTexArraySize;
-	cudaMipmappedArray_t cuMipArray{};
-	cudaArray_t cuArray{};
 	cudaSurfaceObject_t cuSurface{};
+	//UINT8* cuCheck{};
+	//UINT8* cuCheck_host{};
 
 	UINT8 TextureChannels;
 	size_t TextureSize_dev{};
@@ -128,6 +121,36 @@ auto DX12CudaInterop::LogMessage(T&&... args) -> void
 		wchar_t updatedMessage[4096];
 		swprintf_s(updatedMessage, forward<T>(args)...);
 		Messages.push_back(*new wstring(updatedMessage));
+		throw;
 		//LogMessageChangedCallback(updatedMessage);
 	}
+}
+
+template <typename T>
+auto DX12CudaInterop::WriteImageToFile(const char* filename, T* image) -> void
+{
+	auto tif = TIFFOpen(filename, "w");
+	if (tif)
+	{
+		TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, TextureWidth);
+		TIFFSetField(tif, TIFFTAG_IMAGELENGTH, TextureHeight);
+		TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, 3);
+		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
+		TIFFSetField(tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+		TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
+		TIFFSetField(tif, TIFFTAG_SOFTWARE, "simpleD3D12-D3D12CudaSurf");
+
+		auto scanlineSize = TIFFScanlineSize(tif);
+		auto scanline = static_cast<T*>(_TIFFmalloc(scanlineSize));
+		auto stride = TextureWidth * 3;
+		for (auto y = 0; y < TextureHeight; y++)
+		{
+			memcpy(scanline, image + y * stride, scanlineSize);
+			TIFFWriteScanline(tif, scanline, y, 0);
+		}
+		TIFFFlushData(tif);
+		free(scanline);
+	}
+	TIFFClose(tif);
 }

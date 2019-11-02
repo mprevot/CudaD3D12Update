@@ -8,7 +8,7 @@ using namespace std;
 //DXGI_FORMAT_R16G16B16A16_FLOAT
 //DXGI_FORMAT_R8G8B8A8_UNORM
 //DXGI_FORMAT_R10G10B10A2_UNORM
-#define DGXIFormat DXGI_FORMAT_R16G16B16A16_FLOAT
+#define DGXIFormat DXGI_FORMAT_R10G10B10A2_UNORM
 
 class WindowsSecurityAttributes {
 protected:
@@ -93,8 +93,7 @@ void DX12CudaInterop::OnInit()
 // Load the rendering pipeline dependencies.
 void DX12CudaInterop::LoadPipeline()
 {
-	UINT dxgiFactoryFlags = 0;
-
+	UINT dxgiFactoryFlags{};
 #if defined(_DEBUG)
 	// Enable the debug layer (requires the Graphics Tools "optional feature").
 	// NOTE: Enabling the debug layer after device creation will invalidate the active device.
@@ -202,6 +201,12 @@ void DX12CudaInterop::InitCuda()
 			break;
 		}
 	}
+}
+
+inline void Open(string path)
+{
+	replace(path.begin(), path.end(), '/', '\\');
+	ShellExecute(0, 0, path.c_str(), 0, 0, SW_SHOW);
 }
 
 // Load the sample assets.
@@ -382,18 +387,28 @@ void DX12CudaInterop::LoadAssets()
 			cuExtmemMipDesc.extent = make_cudaExtent(TextureWidth, TextureHeight, 0);
 			cuExtmemMipDesc.formatDesc = cudaCreateChannelDesc<float4>();
 			cuExtmemMipDesc.numLevels = 1;
+			cudaMipmappedArray_t cuMipArray{};
 			CheckCudaErrors(cudaExternalMemoryGetMappedMipmappedArray(&cuMipArray, m_externalMemory, &cuExtmemMipDesc));
+			cudaArray_t cuArray{};
 			CheckCudaErrors(cudaGetMipmappedArrayLevel(&cuArray, cuMipArray, 0));
-			
 			cudaResourceDesc cuResDesc{};
 			cuResDesc.resType = cudaResourceTypeArray;
 			cuResDesc.res.array.array = cuArray;
 			checkCudaErrors(cudaCreateSurfaceObject(&cuSurface, &cuResDesc));
 
+			//auto cuCheckSizeBytes = texturePixels * sizeof(UINT8);
+			//CheckCudaErrors(cudaMalloc(&cuCheck, cuCheckSizeBytes));
+			//CheckCudaErrors(cudaMemset(cuCheck, 0, cuCheckSizeBytes));
+			//cuCheck_host = (UINT8*)malloc(cuCheckSizeBytes);
+
 			m_AnimTime = 1.0f;
 			UpdateCudaSurface();
-
+			
 			CheckCudaErrors(cudaStreamSynchronize(m_streamToRun));
+			//CheckCudaErrors(cudaMemcpy(cuCheck_host, cuCheck, cuCheckSizeBytes, cudaMemcpyDeviceToHost));
+			//auto file = "cuCheck.tif";
+			//WriteImageToFile(file, cuCheck_host);
+			//Open(file);
 		}
 	}
 
@@ -430,7 +445,7 @@ void DX12CudaInterop::LoadAssets()
 
 void DX12CudaInterop::UpdateCudaSurface()
 {
-	RunKernel(TextureWidth, TextureHeight, cuSurface, m_streamToRun, m_AnimTime, TextureChannels);
+	RunKernel(TextureWidth, TextureHeight, cuSurface, m_streamToRun, m_AnimTime);
 }
 
 // Render the scene.
