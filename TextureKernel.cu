@@ -44,7 +44,7 @@ __global__ void UpdateSurface(cudaSurfaceObject_t surf, unsigned int width, unsi
 
 void RunKernel(size_t textureW, size_t textureH, cudaSurfaceObject_t surfaceObject, cudaStream_t streamToRun, float animTime)
 {
-	auto unit = 32;
+	auto unit = 16;
 	dim3 threads(unit, unit);
 	dim3 grid(iDivUp(textureW, unit), iDivUp(textureH, unit));
 	UpdateSurface <<<grid, threads, 0, streamToRun >>> (surfaceObject, textureW, textureH, animTime, unit);
