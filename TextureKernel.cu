@@ -6,7 +6,7 @@
 
 int iDivUp(int a, int b) { return a % b != 0 ? a / b + 1 : a / b; }
 
-__global__ void UpdateSurface(cudaSurfaceObject_t surf, unsigned int width, unsigned int height, float time)
+__global__ void UpdateSurface(cudaSurfaceObject_t surf, unsigned int width, unsigned int height, float time, UINT8 unit)
 {
 	unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
 	unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -39,14 +39,14 @@ __global__ void UpdateSurface(cudaSurfaceObject_t surf, unsigned int width, unsi
 		pixel = make_float4(costxMany, costxMany * 0.9, costxMany * 0.6, 1);
 	else
 		pixel = make_float4(costx * 0.3, costx * 0.4, costx * 0.6, 1);
-	surf2Dwrite(pixel, surf, x*16, y);
+	surf2Dwrite(pixel, surf, x * unit, y);
 }
 
 void RunKernel(size_t textureW, size_t textureH, cudaSurfaceObject_t surfaceObject, cudaStream_t streamToRun, float animTime)
 {
-	auto unit = 16;
+	auto unit = 32;
 	dim3 threads(unit, unit);
 	dim3 grid(iDivUp(textureW, unit), iDivUp(textureH, unit));
-	UpdateSurface <<<grid, threads, 0, streamToRun >>> (surfaceObject, textureW, textureH, animTime);
+	UpdateSurface <<<grid, threads, 0, streamToRun >>> (surfaceObject, textureW, textureH, animTime, unit);
 	getLastCudaError("UpdateSurface execution failed.\n");
 }
