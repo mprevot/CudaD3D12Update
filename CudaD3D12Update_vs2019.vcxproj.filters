@@ -4,8 +4,8 @@
     <ClCompile Include="DX12CudaSample.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Win32Application.cpp" />
-    <ClCompile Include="simpleD3D12.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="simpleD3D12update.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CudaSample.h" />
@@ -13,7 +13,6 @@
     <ClInclude Include="ShaderStructs.h" />
     <ClInclude Include="Win32Application.h" />
     <ClInclude Include="d3dx12.h" />
-    <ClInclude Include="simpleD3D12.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="shaders.hlsl">
       <Filter>shaders</Filter>
@@ -21,6 +20,7 @@
     <ClInclude Include="float_intrinsic.h">
       <Filter>intrinsics</Filter>
     </ClInclude>
+    <ClInclude Include="simpleD3D12update.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="shaders">

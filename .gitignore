@@ -2,7 +2,7 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/.vs/simpleD3D12_vs2019/v16
+/.vs
 /x64
 *png
 *user
