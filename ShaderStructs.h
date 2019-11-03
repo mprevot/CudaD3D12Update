@@ -19,3 +19,4 @@ struct TexVertex
 };
 
 void RunKernel(size_t textureW, size_t textureH, cudaSurfaceObject_t surface, cudaStream_t streamToRun, float animTime);
+void RunKernel(size_t textureW, size_t textureH, surfaceReference *surfaceRef, cudaStream_t streamToRun, float animTime);

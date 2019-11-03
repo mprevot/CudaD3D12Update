@@ -84,6 +84,7 @@ private:
 	float timeStep{0.1};
 	
 	cudaSurfaceObject_t cuSurface{};
+	surfaceReference cuSurfaceRef{};
 	//UINT8* cuCheck{};
 	//UINT8* cuCheck_host{};
 

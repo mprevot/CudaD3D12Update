@@ -57,20 +57,15 @@ WindowsSecurityAttributes::~WindowsSecurityAttributes()
 	PSID* ppSID = (PSID*)((PBYTE)m_winPSecurityDescriptor + SECURITY_DESCRIPTOR_MIN_LENGTH);
 	PACL* ppACL = (PACL*)((PBYTE)ppSID + sizeof(PSID*));
 
-	if (*ppSID) {
+	if (*ppSID)
 		FreeSid(*ppSID);
-	}
-	if (*ppACL) {
+	if (*ppACL)
 		LocalFree(*ppACL);
-	}
 	free(m_winPSecurityDescriptor);
 }
 
 SECURITY_ATTRIBUTES *
-WindowsSecurityAttributes::operator&()
-{
-	return &m_winSecurityAttributes;
-}
+WindowsSecurityAttributes::operator&() { return &m_winSecurityAttributes; }
 
 DX12CudaInterop::DX12CudaInterop(UINT width, UINT height, std::string name) :
 	DX12CudaSample(width, height, name),
@@ -189,8 +184,8 @@ void DX12CudaInterop::InitCuda()
 	{
 		cudaDeviceProp devProp{};
 		CheckCudaErrors(cudaGetDeviceProperties(&devProp, devId));
-		auto cmp1 = memcmp(&m_dx12deviceluid.LowPart, devProp.luid, sizeof(m_dx12deviceluid.LowPart)) == 0;
-		auto cmp2 = memcmp(&m_dx12deviceluid.HighPart, devProp.luid + sizeof(m_dx12deviceluid.LowPart), sizeof(m_dx12deviceluid.HighPart)) == 0;
+		const auto cmp1 = memcmp(&m_dx12deviceluid.LowPart, devProp.luid, sizeof(m_dx12deviceluid.LowPart)) == 0;
+		const auto cmp2 = memcmp(&m_dx12deviceluid.HighPart, devProp.luid + sizeof(m_dx12deviceluid.LowPart), sizeof(m_dx12deviceluid.HighPart)) == 0;
 		if (cmp1 && cmp2)
         {
 			CheckCudaErrors(cudaSetDevice(devId));
@@ -343,8 +338,8 @@ void DX12CudaInterop::LoadAssets()
 		const auto texturePixels = textureSurface * TextureChannels;
 		const auto textureSizeBytes = sizeof(float)* texturePixels;
 
-		const auto texFmt = TextureChannels == 4 ? DXGI_FORMAT_R32G32B32A32_FLOAT : DXGI_FORMAT_R32G32B32_FLOAT;
-		const auto texDesc = CD3DX12_RESOURCE_DESC::Tex2D(texFmt, TextureWidth, TextureHeight, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS);
+		const auto texFormat = TextureChannels == 4 ? DXGI_FORMAT_R32G32B32A32_FLOAT : DXGI_FORMAT_R32G32B32_FLOAT;
+		const auto texDesc = CD3DX12_RESOURCE_DESC::Tex2D(texFormat, TextureWidth, TextureHeight, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS);
 		ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_SHARED,
 			&texDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&TextureArray)));
 		NAME_D3D12_OBJECT(TextureArray);
@@ -359,8 +354,7 @@ void DX12CudaInterop::LoadAssets()
 
 		HANDLE sharedHandle{};
 		WindowsSecurityAttributes secAttr{};
-		LPCWSTR name{};
-		ThrowIfFailed(m_device->CreateSharedHandle(TextureArray.Get(), &secAttr, GENERIC_ALL, name, &sharedHandle));
+		ThrowIfFailed(m_device->CreateSharedHandle(TextureArray.Get(), &secAttr, GENERIC_ALL, 0, &sharedHandle));
 		const auto texAllocInfo = m_device->GetResourceAllocationInfo(m_nodeMask, 1, &texDesc);
 
 		cudaExternalMemoryHandleDesc cuExtmemHandleDesc{};
@@ -374,31 +368,23 @@ void DX12CudaInterop::LoadAssets()
 		cuExtmemMipDesc.extent = make_cudaExtent(texDesc.Width, texDesc.Height, 0);
 		cuExtmemMipDesc.formatDesc = cudaCreateChannelDesc<float4>();
 		cuExtmemMipDesc.numLevels = 1;
+		cuExtmemMipDesc.flags = cudaArraySurfaceLoadStore;
 		
 		cudaMipmappedArray_t cuMipArray{};
 		CheckCudaErrors(cudaExternalMemoryGetMappedMipmappedArray(&cuMipArray, m_externalMemory, &cuExtmemMipDesc));
 
 		cudaArray_t cuArray{};
 		CheckCudaErrors(cudaGetMipmappedArrayLevel(&cuArray, cuMipArray, 0));
-
+		
 		cudaResourceDesc cuResDesc{};
 		cuResDesc.resType = cudaResourceTypeArray;
 		cuResDesc.res.array.array = cuArray;
 		checkCudaErrors(cudaCreateSurfaceObject(&cuSurface, &cuResDesc));
-		
-		//auto cuCheckSizeBytes = texturePixels * sizeof(UINT8);
-		//CheckCudaErrors(cudaMalloc(&cuCheck, cuCheckSizeBytes));
-		//CheckCudaErrors(cudaMemset(cuCheck, 0, cuCheckSizeBytes));
-		//cuCheck_host = (UINT8*)malloc(cuCheckSizeBytes);
 		 
 		m_AnimTime = 1.0f;
 		UpdateCudaSurface();
 		
 		CheckCudaErrors(cudaStreamSynchronize(m_streamToRun));
-		//CheckCudaErrors(cudaMemcpy(cuCheck_host, cuCheck, cuCheckSizeBytes, cudaMemcpyDeviceToHost));
-		//auto file = "cuCheck.tif";
-		//WriteImageToFile(file, cuCheck_host);
-		//Open(file);
 	}
 
 	// Close and execute commands
@@ -434,6 +420,7 @@ void DX12CudaInterop::LoadAssets()
 
 void DX12CudaInterop::UpdateCudaSurface()
 {
+	//RunKernel(TextureWidth, TextureHeight, &cuSurfaceRef, m_streamToRun, m_AnimTime);
 	RunKernel(TextureWidth, TextureHeight, cuSurface, m_streamToRun, m_AnimTime);
 }
 

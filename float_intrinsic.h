@@ -2,8 +2,9 @@
 #include "cuda_runtime.h"
 
 #if defined (__INTELLISENSE__) | defined (__RESHARPER__)
-template<class T>
-void surf2Dwrite(T data, cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode = cudaBoundaryModeTrap);
+template<class T1, class T2>
+void surf2Dwrite(T1 data, T2 surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode = cudaBoundaryModeTrap);
+
 
 // Calculate the fast approximate cosine of the input argument.
 __device__ float __cosf (float x);
