@@ -6,7 +6,6 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
-#include <tiffio.h>
 
 typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::steady_clock::time_point TimePoint;
@@ -82,14 +81,8 @@ private:
 	UINT m_nodeMask;
 	float m_AnimTime;
 	float timeStep{0.1};
-	
 	cudaSurfaceObject_t cuSurface{};
-	surfaceReference cuSurfaceRef{};
-	//UINT8* cuCheck{};
-	//UINT8* cuCheck_host{};
-
 	UINT8 TextureChannels;
-	size_t TextureSize_dev{};
 	
 	void LoadPipeline();
 	void InitCuda();
@@ -127,31 +120,31 @@ auto DX12CudaInterop::LogMessage(T&&... args) -> void
 	}
 }
 
-template <typename T>
-auto DX12CudaInterop::WriteImageToFile(const char* filename, T* image) -> void
-{
-	auto tif = TIFFOpen(filename, "w");
-	if (tif)
-	{
-		TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, TextureWidth);
-		TIFFSetField(tif, TIFFTAG_IMAGELENGTH, TextureHeight);
-		TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, 3);
-		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
-		TIFFSetField(tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
-		TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
-		TIFFSetField(tif, TIFFTAG_SOFTWARE, "simpleD3D12-D3D12CudaSurf");
-
-		auto scanlineSize = TIFFScanlineSize(tif);
-		auto scanline = static_cast<T*>(_TIFFmalloc(scanlineSize));
-		auto stride = TextureWidth * 3;
-		for (auto y = 0; y < TextureHeight; y++)
-		{
-			memcpy(scanline, image + y * stride, scanlineSize);
-			TIFFWriteScanline(tif, scanline, y, 0);
-		}
-		TIFFFlushData(tif);
-		free(scanline);
-	}
-	TIFFClose(tif);
-}
+//template <typename T>
+//auto DX12CudaInterop::WriteImageToFile(const char* filename, T* image) -> void
+//{
+//	auto tif = TIFFOpen(filename, "w");
+//	if (tif)
+//	{
+//		TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, TextureWidth);
+//		TIFFSetField(tif, TIFFTAG_IMAGELENGTH, TextureHeight);
+//		TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, 3);
+//		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
+//		TIFFSetField(tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+//		TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+//		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
+//		TIFFSetField(tif, TIFFTAG_SOFTWARE, "simpleD3D12-D3D12CudaSurf");
+//
+//		auto scanlineSize = TIFFScanlineSize(tif);
+//		auto scanline = static_cast<T*>(_TIFFmalloc(scanlineSize));
+//		auto stride = TextureWidth * 3;
+//		for (auto y = 0; y < TextureHeight; y++)
+//		{
+//			memcpy(scanline, image + y * stride, scanlineSize);
+//			TIFFWriteScanline(tif, scanline, y, 0);
+//		}
+//		TIFFFlushData(tif);
+//		free(scanline);
+//	}
+//	TIFFClose(tif);
+//}

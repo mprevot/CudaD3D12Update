@@ -104,7 +104,6 @@ void DX12CudaInterop::LoadPipeline()
 
 	ComPtr<IDXGIAdapter1> hardwareAdapter;
 	GetHardwareAdapter(factory.Get(), &hardwareAdapter);
-
 	ThrowIfFailed(D3D12CreateDevice(hardwareAdapter.Get(), D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&m_device)));
 	DXGI_ADAPTER_DESC1 desc;
 	hardwareAdapter->GetDesc1(&desc);
@@ -295,8 +294,8 @@ void DX12CudaInterop::LoadAssets()
 	// Create the vertex buffer.
 	ComPtr<ID3D12Resource> vertexBufferUpload{};
 	{
-		constexpr auto y = 1.0f;// *m_aspectRatio;
-		constexpr auto x = 1.0f;
+		const auto y = 1.0f;// *m_aspectRatio;
+		const auto x = 1.0f;
 		TexVertex quadVertices[] =
 		{
 			{ {-x,-y, 0.0f }, { 0.0f, 0.0f } },
@@ -501,7 +500,7 @@ void DX12CudaInterop::PopulateCommandList()
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-	m_commandList->DrawInstanced(TextureHeight*TextureWidth, 1, 0, 0);
+	m_commandList->DrawInstanced(4, 1, 0, 0);
 
 	// Indicate that the back buffer will now be used to present.
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(),
@@ -531,7 +530,7 @@ void DX12CudaInterop::MoveToNextFrame()
 	externalSemaphoreWaitParams.params.fence.value = currentFenceValue;
 	CheckCudaErrors(cudaWaitExternalSemaphoresAsync(&m_externalSemaphore, &externalSemaphoreWaitParams, 1, m_streamToRun));
 
-	m_AnimTime += .05;
+	m_AnimTime += .1;
 	UpdateCudaSurface();
 
 	m_fenceValues[m_frameIndex] = currentFenceValue + 1;
