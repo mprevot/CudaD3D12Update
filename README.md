@@ -8,7 +8,7 @@ A sample that demonstrate a DirectX 12 texture updated by cuda, through a cudaAr
 
 - Windows 10 (1903 recommended)
 - Visual Studio 2019 (workloads: desktop dev with c++, game dev with c++)
-- cuda 10 (https://developer.nvidia.com/cuda-downloads) and an nvidia GPU.
+- cuda 10 (https://developer.nvidia.com/cuda-downloads) and an nvidia GPU with 7.5 compute calpabilities (you can adjust the achitecture target eventually).
 
 ## feedback 
 Contact: mprevot@freebsd.org
