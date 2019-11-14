@@ -7,7 +7,7 @@ A sample that demonstrate a DirectX 12 texture updated by cuda, through a cudaAr
 ## requirements
 
 - Windows 10 (1903 recommended)
-- Visual Studio 2019
+- Visual Studio 2019 (workloads: desktop dev with c++, game dev with c++)
 - cuda 10 and an nvidia GPU.
 
 ## feedback 
