@@ -8,8 +8,8 @@ A sample that demonstrate a DirectX 12 texture updated by cuda, through a cudaAr
 
 ### software
 - Windows 10 (1903 or more recent recommended)
-- Visual Studio 2019 or 2022 (workloads: desktop dev with c++, game dev with c++)
-- cuda 11.8 or 12 (https://developer.nvidia.com/cuda-downloads)
+- Visual Studio 2026 (workloads: desktop dev with c++, game dev with c++)
+- cuda 13.2 (https://developer.nvidia.com/cuda-downloads)
 
 ### hardware
 - nvidia GPU with 7.5 compute calpabilities or more (you can adjust the achitecture target in the project eventually).
