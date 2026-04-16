@@ -3,6 +3,8 @@
 #include <aclapi.h>
 #include <sstream>
 
+#include "helper_cuda.h"
+
 using namespace std;
 
 //DXGI_FORMAT_R16G16B16A16_FLOAT

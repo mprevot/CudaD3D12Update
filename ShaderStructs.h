@@ -2,7 +2,6 @@
 
 #include "stdafx.h"
 #include <cuda_runtime.h>
-#include "helper_cuda.h"
 
 using namespace DirectX;
 
